@@ -1,7 +1,7 @@
 import Foundation
 
 public extension Int {
-
+    
     /// Categorizes a status code.
     ///
     /// - Returns: The NetworkingStatusCodeType of the status code.
@@ -26,16 +26,17 @@ public extension Int {
 }
 
 open class Networking {
+    
     static let domain = "com.3lvis.networking"
-
+    
     enum RequestType: String {
         case get = "GET", post = "POST", put = "PUT", patch = "PATCH", delete = "DELETE"
     }
-
+    
     enum SessionTaskType: String {
         case data, upload, download
     }
-
+    
     /// Sets the rules to serialize your parameters, also sets the `Content-Type` header.
     ///
     /// - none: No Content-Type header
@@ -45,7 +46,7 @@ open class Networking {
     /// - custom: Sends your parameters as plain data, sets your `Content-Type` to the value inside `custom`.
     public enum ParameterType {
         case none, json, formURLEncoded, multipartFormData, custom(String)
-
+        
         func contentType(_ boundary: String) -> String? {
             switch self {
             case .none:
@@ -61,12 +62,12 @@ open class Networking {
             }
         }
     }
-
+    
     enum ResponseType {
         case json
         case data
         case image
-
+        
         var accept: String? {
             switch self {
             case .json:
@@ -76,7 +77,7 @@ open class Networking {
             }
         }
     }
-
+    
     /// Categorizes a status code.
     ///
     /// - informational: This class of status code indicates a provisional response, consisting only of the Status-Line and optional headers, and is terminated by an empty line.
@@ -89,35 +90,34 @@ open class Networking {
     public enum StatusCodeType {
         case informational, successful, redirection, clientError, serverError, cancelled, unknown
     }
-
+    
     fileprivate let baseURL: String
-    var fakeRequests = [RequestType: [String: FakeRequest]]()
     var token: String?
     var authorizationHeaderValue: String?
     var authorizationHeaderKey = "Authorization"
     fileprivate var configuration: URLSessionConfiguration
     var cache: NSCache<AnyObject, AnyObject>
-
+    
     /// Flag used to indicate synchronous request.
     public var isSynchronous = false
-
+    
     /// Flag used to disable error logging. Useful when want to disable log before release build.
     public var isErrorLoggingEnabled = true
-
+    
     /// The boundary used for multipart requests.
     let boundary = String(format: "net.3lvis.networking.%08x%08x", arc4random(), arc4random())
-
+    
     lazy var session: URLSession = {
         URLSession(configuration: self.configuration)
     }()
-
+    
     /// Caching options
     public enum CachingLevel {
         case memory
         case memoryAndFile
         case none
     }
-
+    
     /// Base initializer, it creates an instance of `Networking`.
     ///
     /// - Parameters:
@@ -129,7 +129,7 @@ open class Networking {
         self.configuration = configuration
         self.cache = cache ?? NSCache()
     }
-
+    
     /// Authenticates using Basic Authentication, it converts username:password to Base64 then sets the Authorization header to "Basic \(Base64(username:password))".
     ///
     /// - Parameters:
@@ -140,22 +140,22 @@ open class Networking {
         if let credentialsData = credentialsString.data(using: .utf8) {
             let base64Credentials = credentialsData.base64EncodedString(options: [])
             let authString = "Basic \(base64Credentials)"
-
+            
             authorizationHeaderKey = "Authorization"
             authorizationHeaderValue = authString
         }
     }
-
+    
     /// Authenticates using a Bearer token, sets the Authorization header to "Bearer \(token)".
     ///
     /// - Parameter token: The token to be used.
     public func setAuthorizationHeader(token: String) {
         self.token = token
     }
-
+    
     /// Sets the header fields for every HTTP call.
     public var headerFields: [String: String]?
-
+    
     /// Authenticates using a custom HTTP Authorization header.
     ///
     /// - Parameters:
@@ -165,10 +165,10 @@ open class Networking {
         authorizationHeaderKey = headerKey
         authorizationHeaderValue = headerValue
     }
-
+    
     /// Callback used to intercept requests that return with a 403 or 401 status code.
     public var unauthorizedRequestCallback: (() -> Void)?
-
+    
     /// Returns a URL by appending the provided path to the Networking's base URL.
     ///
     /// - Parameter path: The path to be appended to the base URL.
@@ -181,7 +181,7 @@ open class Networking {
         }
         return url
     }
-
+    
     /// Returns the URL used to store a resource for a certain path. Useful to find where a download image is located.
     ///
     /// - Parameters:
@@ -198,22 +198,22 @@ open class Networking {
             let url = try composedURL(with: path)
             resourcesPath = url.absoluteString
         }
-
+        
         let normalizedResourcesPath = resourcesPath.replacingOccurrences(of: "/", with: "-")
         let folderPath = Networking.domain
         let finalPath = "\(folderPath)/\(normalizedResourcesPath)"
-
+        
         if let url = URL(string: finalPath) {
             let directory = FileManager.SearchPathDirectory.cachesDirectory
             if let cachesURL = FileManager.default.urls(for: directory, in: .userDomainMask).first {
                 let folderURL = cachesURL.appendingPathComponent(URL(string: folderPath)!.absoluteString)
-
+                
                 if FileManager.default.exists(at: folderURL) == false {
                     try FileManager.default.createDirectory(at: folderURL, withIntermediateDirectories: false, attributes: nil)
                 }
-
+                
                 let destinationURL = cachesURL.appendingPathComponent(url.absoluteString)
-
+                
                 return destinationURL
             } else {
                 throw NSError(domain: Networking.domain, code: 9999, userInfo: [NSLocalizedDescriptionKey: "Couldn't normalize url"])
@@ -222,7 +222,7 @@ open class Networking {
             throw NSError(domain: Networking.domain, code: 9999, userInfo: [NSLocalizedDescriptionKey: "Couldn't create a url using replacedPath: \(finalPath)"])
         }
     }
-
+    
     /// Splits a url in base url and relative path.
     ///
     /// - Parameter path: The full url to be splitted.
@@ -234,10 +234,10 @@ open class Networking {
         let index = baseURLWithDash.index(before: baseURLWithDash.endIndex)
         let baseURL = String(baseURLWithDash[..<index])
         let relativePath = path.replacingOccurrences(of: baseURL, with: "")
-
+        
         return (baseURL, relativePath)
     }
-
+    
     /// Cancels the request that matches the requestID.
     ///
     /// - Parameter requestID: The ID of the request to be cancelled.
@@ -248,20 +248,20 @@ open class Networking {
             tasks.append(contentsOf: dataTasks as [URLSessionTask])
             tasks.append(contentsOf: uploadTasks as [URLSessionTask])
             tasks.append(contentsOf: downloadTasks as [URLSessionTask])
-
+            
             for task in tasks {
                 if task.taskDescription == requestID {
                     task.cancel()
                     break
                 }
             }
-
+            
             semaphore.signal()
         }
-
+        
         _ = semaphore.wait(timeout: DispatchTime.now() + 60.0)
     }
-
+    
     /// Cancels all the current requests.
     public func cancelAllRequests() {
         let semaphore = DispatchSemaphore(value: 0)
@@ -275,17 +275,16 @@ open class Networking {
             for sessionTask in uploadTasks {
                 sessionTask.cancel()
             }
-
+            
             semaphore.signal()
         }
-
+        
         _ = semaphore.wait(timeout: DispatchTime.now() + 60.0)
     }
-
+    
     /// Removes the stored credentials and cached data.
     public func reset() {
         cache.removeAllObjects()
-        fakeRequests.removeAll()
         token = nil
         headerFields = nil
         authorizationHeaderKey = "Authorization"
@@ -293,7 +292,7 @@ open class Networking {
         
         Networking.deleteCachedFiles()
     }
-
+    
     /// Deletes the downloaded/cached files.
     public static func deleteCachedFiles() {
         let directory = FileManager.SearchPathDirectory.cachesDirectory
